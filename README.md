@@ -132,6 +132,102 @@ para ninguém perder tempo pelo caminho errado.
 
 ---
 
+## Tabela de tokens
+
+O analisador léxico percorre o fonte uma vez, mantendo linha e coluna a partir
+de 1. As expressões abaixo usam a notação usual de expressões regulares; nos
+casos de operadores, delimitadores e palavras reservadas, o reconhecimento é
+literal.
+
+| Token(s) | Forma reconhecida |
+|---|---|
+| `ID` | `[A-Za-z_][A-Za-z0-9_]*`, desde que não seja palavra reservada |
+| `INTEIRO` | `[0-9]+` |
+| `REAL` | `[0-9]+\.[0-9]+` |
+| `TEXTO` | `"([^"\\\r\n]|\\[nt"\\])*"` |
+| `LOGICO` | `verdadeiro` ou `falso` |
+| `FUNCAO`, `RETORNE`, `SE`, `SENAO`, `ENQUANTO`, `ESCREVA` | `funcao`, `retorne`, `se`, `senao`, `enquanto`, `escreva` |
+| `TIPO_INTEIRO`, `TIPO_REAL`, `TIPO_LOGICO`, `TIPO_TEXTO`, `TIPO_VAZIO` | `inteiro`, `real`, `logico`, `texto`, `vazio` |
+| `E`, `OU`, `NAO` | `e`, `ou`, `nao` |
+| `MAIS`, `MENOS`, `VEZES`, `DIVIDE`, `RESTO` | `+`, `-`, `*`, `/`, `%` |
+| `IGUAL`, `DIFERENTE`, `MENOR`, `MENOR_IGUAL`, `MAIOR`, `MAIOR_IGUAL` | `==`, `!=`, `<`, `<=`, `>`, `>=` |
+| `ATRIBUI` | `=` |
+| `ABRE_PAR`, `FECHA_PAR`, `ABRE_CHAVE`, `FECHA_CHAVE` | `(`, `)`, `{`, `}` |
+| `VIRGULA`, `PONTO_VIRGULA` | `,`, `;` |
+| `FIM_ARQUIVO` | fim da entrada; lexema vazio |
+
+Espaços (`[ \t\r\n]+`) e comentários de linha (`//` até a quebra) ou de
+bloco (`/*` até o primeiro `*/`) são consumidos sem produzir token. Os
+operadores de dois caracteres são tentados antes dos de um caractere. Em
+textos, apenas `\n`, `\t`, `\"` e `\\` são escapes válidos; o lexema conserva
+aspas e escapes exatamente como escritos.
+
+## Gramática BNF da análise sintática
+
+Os nomes em maiúsculas são tokens da tabela anterior. `ε` representa a
+sequência vazia.
+
+```bnf
+<programa> ::= <funcao> <programa> | ε
+
+<funcao> ::= FUNCAO <tipo-retorno> ID ABRE_PAR <parametros-op> FECHA_PAR <bloco>
+<tipo-retorno> ::= <tipo> | TIPO_VAZIO
+<tipo> ::= TIPO_INTEIRO | TIPO_REAL | TIPO_LOGICO | TIPO_TEXTO
+<parametros-op> ::= <parametros> | ε
+<parametros> ::= <parametro> <parametros-cauda>
+<parametros-cauda> ::= VIRGULA <parametro> <parametros-cauda> | ε
+<parametro> ::= <tipo> ID
+
+<bloco> ::= ABRE_CHAVE <comandos> FECHA_CHAVE
+<comandos> ::= <comando> <comandos> | ε
+<comando> ::= <declaracao>
+            | ID <comando-id>
+            | SE ABRE_PAR <expressao> FECHA_PAR <bloco> <senao-op>
+            | ENQUANTO ABRE_PAR <expressao> FECHA_PAR <bloco>
+            | ESCREVA ABRE_PAR <expressao> FECHA_PAR PONTO_VIRGULA
+            | RETORNE <expressao-op> PONTO_VIRGULA
+            | <bloco>
+<declaracao> ::= <tipo> ID <inicializador-op> PONTO_VIRGULA
+<inicializador-op> ::= ATRIBUI <expressao> | ε
+<comando-id> ::= ATRIBUI <expressao> PONTO_VIRGULA
+               | ABRE_PAR <argumentos-op> FECHA_PAR PONTO_VIRGULA
+<senao-op> ::= SENAO <bloco> | ε
+<expressao-op> ::= <expressao> | ε
+
+<expressao> ::= <e-ou> <ou-cauda>
+<ou-cauda> ::= OU <e-ou> <ou-cauda> | ε
+<e-ou> ::= <igualdade> <e-cauda>
+<e-cauda> ::= E <igualdade> <e-cauda> | ε
+<igualdade> ::= <relacional> <igualdade-cauda>
+<igualdade-cauda> ::= <op-igualdade> <relacional> <igualdade-cauda> | ε
+<op-igualdade> ::= IGUAL | DIFERENTE
+<relacional> ::= <aditiva> <relacional-cauda>
+<relacional-cauda> ::= <op-relacional> <aditiva> <relacional-cauda> | ε
+<op-relacional> ::= MENOR | MENOR_IGUAL | MAIOR | MAIOR_IGUAL
+<aditiva> ::= <multiplicativa> <aditiva-cauda>
+<aditiva-cauda> ::= <op-aditivo> <multiplicativa> <aditiva-cauda> | ε
+<op-aditivo> ::= MAIS | MENOS
+<multiplicativa> ::= <unaria> <multiplicativa-cauda>
+<multiplicativa-cauda> ::= <op-multiplicativo> <unaria> <multiplicativa-cauda> | ε
+<op-multiplicativo> ::= VEZES | DIVIDE | RESTO
+<unaria> ::= NAO <unaria> | MENOS <unaria> | <primaria>
+<primaria> ::= INTEIRO | REAL | LOGICO | TEXTO
+             | ID <chamada-op>
+             | ABRE_PAR <expressao> FECHA_PAR
+<chamada-op> ::= ABRE_PAR <argumentos-op> FECHA_PAR | ε
+<argumentos-op> ::= <argumentos> | ε
+<argumentos> ::= <expressao> <argumentos-cauda>
+<argumentos-cauda> ::= VIRGULA <expressao> <argumentos-cauda> | ε
+```
+
+A ordem das produções de expressão vai da precedência mais fraca (`ou`) à
+mais forte (chamada e parênteses). No código, cada produção `*-cauda` é um
+laço que acumula a árvore pela esquerda, portanto todos os binários são
+associativos à esquerda. `<unaria>` chama a si mesma, tornando `nao` e o
+menos unário associativos à direita.
+
+---
+
 ## Como entregar
 
 1. `git push` no repositório do grupo.
