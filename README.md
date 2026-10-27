@@ -26,20 +26,27 @@ As regras normativas estão em [LINGUAGEM.md](LINGUAGEM.md), os formatos em
 O corretor e o corpus oficial são preservados. A tabela de tokens e a
 BNF abaixo também são requisitos das entregas anteriores.
 
-## Análise semântica
+## Entrega 3 — análise semântica
 
-A tabela é uma lista de objetos `Escopo`, numerados na ordem de abertura;
-cada escopo contém um dicionário de símbolos em ordem de declaração e uma
-referência ao pai. Isso mantém o despejo determinístico e permite buscar
-nomes do bloco atual até o global sem copiar tabelas. O escopo 0 contém
-funções; cada função abre um escopo de parâmetros e seu corpo abre outro.
-Cada bloco, inclusive vazio, abre um escopo próprio.
+### Representação dos escopos
+
+Os escopos são dicionários encadeados pela referência ao pai, mantidos em
+uma lista na ordem de abertura para produzir um despejo determinístico.
+O escopo global contém as funções, cada função abre um escopo de parâmetros
+e outro para o corpo, e cada bloco interno, inclusive vazio, cria um escopo;
+ao encerrar a visita ao bloco, a análise retoma o escopo pai.
+A busca percorre o escopo atual e seus pais, permitindo que uma declaração
+interna sombreie a externa e que a externa volte a ser encontrada ao sair.
+Cada uso de identificador na AST referencia o símbolo resolvido, que registra
+seu escopo e tipo, permitindo associar posições de memória a símbolos distintos na E4
+sem confundir variáveis de mesmo nome nem repetir a resolução de nomes.
+
+### Declarações, tipos e retornos
 
 Um símbolo registra nome, categoria, tipo, linha, número do escopo e, para
 funções, a tupla dos tipos dos parâmetros. Uma declaração duplicada é
-recusada no mesmo escopo. Nomes em blocos internos podem sombrear nomes
-externos, inclusive parâmetros; ao sair do bloco, a análise volta a usar
-o pai. Os corpos são percorridos em ordem, de modo que declarações locais
+recusada no mesmo escopo; parâmetros podem ser sombreados no bloco do corpo.
+Os corpos são percorridos em ordem, de modo que declarações locais
 posteriores não ficam disponíveis antecipadamente. A declaração entra na
 tabela antes da análise do seu inicializador.
 

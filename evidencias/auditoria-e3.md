@@ -3,6 +3,31 @@
 Data: 26/10/2026. Repositório existente, sem recriação do projeto.
 Commit da implementação verificada em clone limpo: `7da8006`.
 
+## Revalidação do prompt complementar
+
+Em 26/10/2026, a implementação existente foi novamente revisada contra os
+requisitos da E3, sem necessidade de modificar os módulos do compilador.
+O README passou a identificar explicitamente a Entrega 3 e a explicar os
+escopos em quatro frases, incluindo como as referências aos símbolos na
+AST permitem associar posições de memória na E4 sem resolver nomes outra vez.
+
+Foram reexecutados os comandos oficiais: E1 aprovou 20/20, E2 aprovou
+36/36 e E3 aprovou 70/70; os 20 testes adicionais também passaram no Python
+nativo e no ambiente POSIX. `make evidencias E=3` regenerou o arquivo oficial
+com conteúdo idêntico ao versionado. Os dez válidos foram aceitos até a
+semântica e os catorze erros semânticos mantiveram as linhas esperadas.
+
+As provas em clone usaram o commit publicado `63e1444`, com o mesmo código
+do diretório de trabalho: `make prova E=3` passou 70/70 (saída 0), enquanto
+`make prova` terminou com saída 2 e as mesmas 23 verificações pendentes da
+E4. O aviso de alterações não commitadas referia-se à documentação em revisão
+e, durante a regeneração, ao arquivo de evidência; nenhum código novo ficou
+fora do clone. Esta revisão altera apenas README e este relatório.
+
+A nova auditoria não encontrou arquivos descartáveis no repositório, portanto
+nenhum arquivo adicional foi removido. Foram mantidos testes, evidências,
+declaração de proveniência, histórico e permissões dos lançadores.
+
 ## Alterações
 
 | Arquivo | Alteração |
