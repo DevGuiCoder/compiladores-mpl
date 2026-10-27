@@ -1,0 +1,4 @@
+# Os lancadores precisam de LF para execucao em shells POSIX.
+compilar text eol=lf
+executar text eol=lf
+*.sh text eol=lf

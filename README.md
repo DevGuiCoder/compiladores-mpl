@@ -1,136 +1,123 @@
-# Minha pequena linguagem
+# Compilador MPL — Entrega 3
 
-Trabalho semestral de **Compiladores** — Ciência da Computação, UNISAGRADO.
-Prof. Luiz Ricardo Mantovani da Silva · 2026-2
+Trabalho de Compiladores — Ciência da Computação, UNISAGRADO.
+Prof. Luiz Ricardo Mantovani da Silva · 2026-2.
+Base acadêmica: [compiladores-lab](https://github.com/LuizRMSilva1973/compiladores-lab).
 
-Cada grupo escreve um **compilador completo** para a MPL, uma linguagem
-pequena de palavras-chave em português. O compilador de vocês vai ler um
-programa em `.mpl`, atravessar as quatro fases da disciplina e produzir um
-arquivo que **roda de verdade** numa máquina virtual que vocês também vão
-escrever.
+Implementação em Python 3.12, somente com a biblioteca padrão. As Entregas
+1, 2 e 3 estão implementadas. Código intermediário, geração de `.mplb` e
+máquina virtual ainda são os esqueletos da Entrega 4: compilar um programa
+válido sem opção de despejo ainda termina com código 3 (`NaoImplementado`).
 
-No fim do semestre vocês executam um programa escrito por vocês, numa
-linguagem compilada por vocês.
+## Arquitetura
 
----
-
-## Comece por aqui
-
-```bash
-git clone https://github.com/LuizRMSilva1973/compiladores-lab.git
-cd compiladores-lab
-```
-
-```bash
-make verificar E=1
-```
-
-Vai dar vermelho — é para dar. O esqueleto responde à linha de comando mas
-ainda não tem nenhuma fase escrita. O vermelho é o seu ponto de partida, e
-ele vai virando verde conforme vocês preenchem `mplc/`.
-
-Não precisa instalar nada além do Python 3. Se o notebook de vocês der
-trabalho, o [Google Cloud Shell](https://shell.cloud.google.com) já vem com
-Python 3.12, Java 21 e git — e é o mesmo ambiente da correção.
-
----
-
-## Os três documentos que mandam
-
-| Arquivo | O que decide |
+| Arquivo | Responsabilidade |
 |---|---|
-| [LINGUAGEM.md](LINGUAGEM.md) | **o que** o compilador aceita: a sintaxe e as regras de tipo da MPL |
-| [CONTRATOS.md](CONTRATOS.md) | **como** ele se comunica: a linha de comando e o formato de cada despejo |
-| [entregas/](entregas/) | o enunciado de cada entrega, com o que vale nota |
+| `mplc/lexico.py` | Tokens com lexema, linha e coluna |
+| `mplc/sintatico.py` | Parser manual por descida recursiva e AST `No` |
+| `mplc/semantica.py` | Assinaturas, escopos, resolução de nomes, tipos e retornos |
+| `mplc/principal.py` | CLI e encadeamento das fases |
+| `mplc/erros.py` | Diagnósticos `ErroMPL` e marcação de fases pendentes |
+| `mplc/intermediario.py`, `gerador.py`, `vm.py` | Interfaces preservadas para a E4 |
+| `testes/` | Corpus oficial e testes adicionais em `test_semantica.py` |
 
-Quando a sua intuição discordar de um deles, é o arquivo que vale. Se o
-arquivo estiver errado, me procurem — já aconteceu de eu escrever um exemplo
-errado no contrato e só descobrir rodando.
+As regras normativas estão em [LINGUAGEM.md](LINGUAGEM.md), os formatos em
+[CONTRATOS.md](CONTRATOS.md) e os critérios em [entregas/](entregas/).
+O corretor e o corpus oficial são preservados. A tabela de tokens e a
+BNF abaixo também são requisitos das entregas anteriores.
 
----
+## Análise semântica
 
-## As entregas
+A tabela é uma lista de objetos `Escopo`, numerados na ordem de abertura;
+cada escopo contém um dicionário de símbolos em ordem de declaração e uma
+referência ao pai. Isso mantém o despejo determinístico e permite buscar
+nomes do bloco atual até o global sem copiar tabelas. O escopo 0 contém
+funções; cada função abre um escopo de parâmetros e seu corpo abre outro.
+Cada bloco, inclusive vazio, abre um escopo próprio.
 
-| # | Entrega | Turma A (quarta) | Turma B (segunda) | Vale |
-|---|---|---|---|---|
-| [E1](entregas/E1.md) | Analisador léxico | 02/09 | 31/08 | 0,8 |
-| [E2](entregas/E2.md) | Analisador sintático e árvore | 30/09 | 28/09 | 1,2 |
-| [E3](entregas/E3.md) | Tabela de símbolos e tipos | 28/10 | 26/10 | 1,2 |
-| [E4](entregas/E4.md) | Código intermediário, geração e VM | 18/11 | 16/11 | 1,8 |
-| [Apres.](entregas/APRESENTACAO.md) | Demonstração e defesa | 25/11 | 23/11 | 1,0 |
+Um símbolo registra nome, categoria, tipo, linha, número do escopo e, para
+funções, a tupla dos tipos dos parâmetros. Uma declaração duplicada é
+recusada no mesmo escopo. Nomes em blocos internos podem sombrear nomes
+externos, inclusive parâmetros; ao sair do bloco, a análise volta a usar
+o pai. Os corpos são percorridos em ordem, de modo que declarações locais
+posteriores não ficam disponíveis antecipadamente. A declaração entra na
+tabela antes da análise do seu inicializador.
 
-São **quatro entregas sobre o mesmo compilador**, não quatro trabalhos. O que
-vocês escreverem na E1 continua rodando na E4 — e o verificador da E4 confere
-tudo o que veio antes. Deixar a E1 pela metade custa caro em novembro.
+A primeira passada registra todas as assinaturas e rejeita funções
+repetidas, sem sobrecarga. Confere também a existência de `principal`,
+com retorno `vazio` e sem parâmetros. A segunda passada percorre cada
+corpo, insere parâmetros e variáveis, resolve identificadores e valida
+expressões e comandos. Assim, chamadas antecipadas e recursão mútua são
+aceitas semanticamente. Chamadas exigem um símbolo de função, a quantidade
+correta de argumentos e tipos compatíveis.
 
----
+Só há promoção implícita de `inteiro` para `real`, em inicializações,
+atribuições, argumentos, retornos e operações numéricas compatíveis.
+`+` também aceita dois textos; `%` exige inteiros; comparações de ordem
+exigem números; igualdade aceita tipos iguais ou números compatíveis;
+operadores lógicos e condições exigem `logico`. Chamadas de retorno
+`vazio` só são permitidas como comando. A análise anota `tipo`, `simbolo`
+e `escopo` em `No.extra`, conforme o nó, sem mudar os rótulos do `--ast`.
+O tipo de `7 / 2` continua `inteiro`, mesmo ao atribuí-lo a uma variável
+`real`; a promoção não altera o tipo dos operandos da divisão.
 
-## Regras do jogo
+A garantia de retorno é estrutural: `retorne` garante retorno, um bloco
+garante se algum de seus comandos garante, e `se/senao` exige garantia
+nos dois ramos. `se` sem `senao` e `enquanto` não garantem retorno, mesmo
+com condição literal `verdadeiro`. Não se avaliam condições constantes.
+Comandos após um retorno também são verificados para detectar nomes e
+tipos inválidos. Funções não vazias sem garantia são diagnosticadas na
+linha da declaração da função.
 
-**A entrega é o repositório, nunca a máquina de vocês.** A correção clona o
-repositório numa máquina limpa e roda `make verificar E=n`. Se não passar
-lá, não conta como entregue. Testem antes de entregar — de preferência na
-Cloud Shell, que é o ambiente da correção.
+A análise para no primeiro erro encontrado: primeiro as assinaturas e a
+entrada do programa, depois os corpos em ordem de fonte, com expressões
+da esquerda para a direita. Diagnósticos usam as posições da AST e o
+formato de `ErroMPL`; a CLI os envia a stderr com código 1. A ausência de
+`principal` é ancorada em linha 1, coluna 1. Não há mensagens de depuração
+em stdout. Divisão por zero é assunto da execução, não desta fase.
 
-**Grupos de até 3.** O mesmo grupo do começo ao fim. Mudança de grupo só até
-a E1.
+## Execução e validação
 
-**Gerador de parser proibido nas Entregas 1 e 2.** ANTLR, PLY, yacc, lark e
-parentes escondem exatamente a parte que está sendo ensinada. Da E3 em diante
-o assunto é outro, e aí não faz diferença. Na apresentação vocês podem — e
-devem — comparar o parser de vocês com o que um gerador produziria.
-
-**A linguagem de implementação é de vocês, entre as que o ambiente da correção
-já tem:** Python 3.12, Java 21, C e C++ (gcc 13), Ruby 3.2 ou PHP 8.3. O
-verificador não olha para dentro — ele roda `./compilar` e `./executar` e
-compara o que sai. O esqueleto em `mplc/` é Python porque é o caminho mais
-curto, mas ninguém é obrigado a usá-lo.
-
-A lista existe por um motivo prático: a correção roda numa Cloud Shell limpa, e
-o que não estiver lá não roda. Querem outra linguagem? Falem comigo **antes** de
-começar — o critério é ela existir no ambiente sem instalação. Em nenhum caso
-dependam de biblioteca externa: só a biblioteca padrão.
-
-**Escrever o compilador é a tarefa.** Usar IA para explicar um conceito,
-revisar uma mensagem de erro ou entender um trecho é bem-vindo, e eu faço
-isso também. Entregar um compilador que vocês não sabem alterar é outra
-coisa — e a apresentação foi desenhada para separar os dois casos: cada grupo
-recebe **uma alteração pequena na linguagem, na hora, com 10 minutos para
-fazer**. Quem escreveu o compilador faz. Não é desconfiança; é o formato.
-
----
-
-## O verificador
+Na raiz do repositório, em Linux/Cloud Shell com Python 3.12, GNU Make,
+Git e shell POSIX:
 
 ```bash
-make verificar E=2      # confere a Entrega 2 e, junto, a 1
-make verificar          # confere as quatro
-make evidencias E=2     # grava evidencias/verificacao-2.txt, que vai na entrega
+./compilar --tokens exemplos/ola.mpl
+./compilar --ast exemplos/tudo.mpl
+./compilar --tabela exemplos/tudo.mpl
+make verificar E=1
+make verificar E=2
+make verificar E=3
+python3 -B -m unittest discover -s testes -p 'test_*.py' -v
+make evidencias E=3
+make prova E=3
+make prova
 ```
 
-**Antes de entregar, rodem `make prova`.** Ele clona o repositório de vocês num
-diretório limpo e verifica lá — que é exatamente o que a correção faz. É o
-teste que pega o defeito mais comum de todos, e que não tem nada a ver com
-compiladores: *funciona aqui e não no clone*. Arquivo esquecido fora do commit,
-caminho absoluto, passo de compilação que ninguém roda. Vale para qualquer
-linguagem, e é a única prova que realmente antecipa a correção.
+`--tokens`, `--ast` e `--tabela` param na fase pedida e não geram `.mplb`.
+O verificador da E3 confere os dez programas válidos e os catorze erros
+semânticos, além das entregas anteriores. Os testes adicionais cobrem
+sombreamento e restauração, escopos vazios, chamadas antecipadas, recursão,
+matrizes de operadores e conversões, retornos estruturais e a CLI.
 
-Ele não lê o código de vocês. Ele roda o compilador e compara a saída com um
-corpus de **10 programas válidos**, **26 programas que precisam ser
-recusados na compilação** e **3 que precisam falhar na execução** — com a
-fase e a linha do erro conferidas.
+`make evidencias E=3` grava `evidencias/verificacao-3.txt`. As evidências
+fazem parte da entrega e devem ser versionadas. `make prova E=3` verifica
+a entrega atual em um clone temporário do **último commit**; alterações
+não commitadas não entram. `make prova` sem `E` verifica as quatro entregas
+e também cobrará a E4 ainda pendente. Consulte os resultados reais e as
+limitações da validação em [evidencias/auditoria-e3.md](evidencias/auditoria-e3.md).
 
-Os programas recusados são metade da nota escondida do trabalho. Um
-compilador que aceita tudo passa em todos os testes positivos e não vale
-nada: é por isso que o corpus tem mais programas errados do que certos.
+## Proveniência e entrega
 
-**A correção usa um segundo corpus, que vocês não têm.** Mesma linguagem,
-mesmas regras, programas diferentes. Um compilador de verdade passa nos dois
-sem que vocês precisem fazer nada; um programa que apenas reproduza as saídas
-esperadas deste corpus passa aqui e reprova lá. Estou dizendo isto abertamente
-para ninguém perder tempo pelo caminho errado.
+O histórico Git mantém a base do professor e as implementações anteriores.
+A implementação da E3, seus testes adicionais e a revisão documental
+receberam auxílio do Codex. O grupo deve revisar e compreender o código
+para a defesa e as alterações ao vivo previstas no enunciado; esta nota
+não substitui as regras acadêmicas em [entregas/APRESENTACAO.md](entregas/APRESENTACAO.md).
 
----
+Para entregar, envie o repositório do grupo e a evidência correspondente
+pelo formulário da [página do trabalho](https://profluiz.mantovanitec.com/disciplinas/aulas/compiladores/trabalho.html).
+Preserve os enunciados, os testes e as evidências das entregas anteriores.
 
 ## Tabela de tokens
 
@@ -227,13 +214,3 @@ associativos à esquerda. `<unaria>` chama a si mesma, tornando `nao` e o
 menos unário associativos à direita.
 
 ---
-
-## Como entregar
-
-1. `git push` no repositório do grupo.
-2. Abram a [página do trabalho](https://profluiz.mantovanitec.com/disciplinas/aulas/compiladores/trabalho.html).
-3. No formulário do fim da página: escolham a entrega, identifiquem os
-   integrantes (nome, RA e e-mail), colem a URL do repositório e anexem o
-   `evidencias/verificacao-N.txt`.
-4. Cada integrante recebe uma cópia por e-mail. **Guardem esse e-mail**: é o
-   comprovante.
