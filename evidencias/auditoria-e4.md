@@ -36,9 +36,22 @@ histórico. A automação `.github/workflows/verificar.yml` valida em Ubuntu
 com Python 3.12: `make prova`, os 27 testes, a vitrine e a correspondência
 da evidência versionada com a saída real do verificador.
 
-O resultado da execução Linux fica registrado na aba Actions do repositório.
-Uma execução pendente ou falha não deve ser tratada como aprovação. Esta
-auditoria será complementada com o resultado observado após a publicação.
+A execução Linux do commit `4ca8c75743ce84b952429ea9a0ee530eaf810e10`
+foi concluída com sucesso em 16/11/2026:
+[GitHub Actions, execução 43985556714](https://github.com/DevGuiCoder/compiladores-mpl/actions/runs/43985556714).
+
+| Etapa | Resultado observado |
+|---|---|
+| `make prova` | Aprovado em clone limpo, nas quatro entregas |
+| Testes adicionais | Aprovados, 27 testes com subcasos |
+| Programa do grupo | Compilação, execução e comparação da saída aprovadas |
+| Evidência E4 | Saída atual do verificador idêntica ao arquivo versionado |
+
+O PDF foi renderizado e inspecionado nas oito páginas; o hash do arquivo
+local é igual ao do blob publicado. `.gitattributes` o marca como binário
+para impedir conversões de fim de linha que poderiam danificar o documento.
+A demonstração `apresentacao/demonstrar.py programa` também foi executada
+localmente e conferiu a saída esperada.
 
 ## Limites
 
