@@ -10,8 +10,9 @@ oficial e os enunciados. O README agora descreve corretamente os operandos
 das instruções e aponta para esta auditoria, mantendo a E3 como histórico.
 
 O programa do grupo é `exemplos/vitrine.mpl`, acompanhado de sua saída.
-A apresentação tem PDF, fonte editável e roteiro de execução com nomes
-informados pelo usuário. O número do grupo continua representado por `NN`.
+A apresentação foi preparada separadamente, com PDF, fonte editável e
+roteiro de execução. A pedido do usuário, esses arquivos foram retirados
+da versão atual do repositório e preservados localmente para envio separado.
 
 ## Resultados locais
 
@@ -47,11 +48,10 @@ foi concluída com sucesso em 16/11/2026:
 | Programa do grupo | Compilação, execução e comparação da saída aprovadas |
 | Evidência E4 | Saída atual do verificador idêntica ao arquivo versionado |
 
-O PDF foi renderizado e inspecionado nas oito páginas; o hash do arquivo
-local é igual ao do blob publicado. `.gitattributes` o marca como binário
-para impedir conversões de fim de linha que poderiam danificar o documento.
-A demonstração `apresentacao/demonstrar.py programa` também foi executada
-localmente e conferiu a saída esperada.
+Antes da retirada do material de apresentação do repositório, o PDF foi
+renderizado e inspecionado nas oito páginas e seu hash foi comparado ao
+blob então publicado. A demonstração local também foi executada e conferiu
+a saída esperada. Esses materiais agora ficam fora do versionamento.
 
 ## Limites
 

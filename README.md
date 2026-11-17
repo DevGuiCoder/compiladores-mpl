@@ -224,10 +224,9 @@ limitações da validação em [evidencias/auditoria-e4.md](evidencias/auditoria
 A auditoria da E3 permanece como registro histórico daquela entrega.
 
 A automação em `.github/workflows/verificar.yml` executa as quatro entregas,
-os testes adicionais e o programa do grupo em um clone Linux. O roteiro de
-demonstração está em [apresentacao/roteiro.md](apresentacao/roteiro.md), junto
-dos [slides em PDF](apresentacao/apresentacao-grupo-NN.pdf). Substitua `NN`
-pelo número do grupo antes de enviar o PDF à disciplina.
+os testes adicionais e o programa do grupo em um clone Linux. O material de
+apresentação é mantido separadamente e o PDF deve ser enviado no espaço da
+apresentação na plataforma da disciplina.
 
 ## Proveniência e entrega
 
