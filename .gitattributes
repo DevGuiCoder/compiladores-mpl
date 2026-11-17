@@ -2,3 +2,4 @@
 compilar text eol=lf
 executar text eol=lf
 *.sh text eol=lf
+*.pdf binary
