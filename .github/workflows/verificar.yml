@@ -1,0 +1,31 @@
+name: Verificar MPL
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  entrega:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verificacao oficial em clone limpo
+        run: make prova
+      - name: Testes adicionais
+        run: python3 -B -m unittest discover -s testes -p 'test_*.py' -v
+      - name: Programa do grupo
+        run: |
+          ./compilar exemplos/vitrine.mpl
+          ./executar exemplos/vitrine.mplb > /tmp/vitrine.saida
+          diff -u exemplos/vitrine.saida /tmp/vitrine.saida
+      - name: Conferir evidencia versionada
+        run: |
+          python3 verificar.py 4 > /tmp/verificacao-4.txt
+          diff -u evidencias/verificacao-4.txt /tmp/verificacao-4.txt

@@ -1,0 +1,22 @@
+== Torre de Hanoi com 3 discos ==
+  disco 1: A -> C
+  disco 2: A -> B
+  disco 1: C -> B
+  disco 3: A -> C
+  disco 1: B -> A
+  disco 2: B -> C
+  disco 1: A -> C
+total: 7 movimentos (com 10 discos seriam 1023)
+== Numeros em outras bases ==
+1 = 1 (base 2) = 1 (base 8)
+6 = 110 (base 2) = 6 (base 8)
+31 = 11111 (base 2) = 37 (base 8)
+156 = 10011100 (base 2) = 234 (base 8)
+== Raiz quadrada por Newton ==
+1.414214
+3.162278
+== Collatz ==
+27 chega a 1 em 111 passos
+== As armadilhas da divisao ==
+3.000000
+-7 / 2 = -3   e   -7 % 3 = -1

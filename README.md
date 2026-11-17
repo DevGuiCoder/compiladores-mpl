@@ -1,13 +1,15 @@
-# Compilador MPL — Entrega 3
+# Compilador MPL — Entrega 4
 
 Trabalho de Compiladores — Ciência da Computação, UNISAGRADO.
 Prof. Luiz Ricardo Mantovani da Silva · 2026-2.
 Base acadêmica: [compiladores-lab](https://github.com/LuizRMSilva1973/compiladores-lab).
 
-Implementação em Python 3.12, somente com a biblioteca padrão. As Entregas
-1, 2 e 3 estão implementadas. Código intermediário, geração de `.mplb` e
-máquina virtual ainda são os esqueletos da Entrega 4: compilar um programa
-válido sem opção de despejo ainda termina com código 3 (`NaoImplementado`).
+Integrantes: Luiz Guilherme Silva Caride, Caio Colo e Eduuardo Bishop.
+
+Implementação em Python 3.12, somente com a biblioteca padrão. As quatro
+entregas estão implementadas: análise léxica, sintática e semântica,
+código de três endereços, geração do `.mplb` (texto legível) e a máquina
+virtual de pilha que o executa.
 
 ## Arquitetura
 
@@ -18,8 +20,10 @@ válido sem opção de despejo ainda termina com código 3 (`NaoImplementado`).
 | `mplc/semantica.py` | Assinaturas, escopos, resolução de nomes, tipos e retornos |
 | `mplc/principal.py` | CLI e encadeamento das fases |
 | `mplc/erros.py` | Diagnósticos `ErroMPL` e marcação de fases pendentes |
-| `mplc/intermediario.py`, `gerador.py`, `vm.py` | Interfaces preservadas para a E4 |
-| `testes/` | Corpus oficial e testes adicionais em `test_semantica.py` |
+| `mplc/intermediario.py` | Código de três endereços (`--ir`) |
+| `mplc/gerador.py` | Tradução do três endereços para o `.mplb` de pilha |
+| `mplc/vm.py` | Máquina virtual de pilha com registros de ativação |
+| `testes/` | Corpus oficial e testes adicionais de semântica e execução |
 
 As regras normativas estão em [LINGUAGEM.md](LINGUAGEM.md), os formatos em
 [CONTRATOS.md](CONTRATOS.md) e os critérios em [entregas/](entregas/).
@@ -83,6 +87,107 @@ formato de `ErroMPL`; a CLI os envia a stderr com código 1. A ausência de
 `principal` é ancorada em linha 1, coluna 1. Não há mensagens de depuração
 em stdout. Divisão por zero é assunto da execução, não desta fase.
 
+## Entrega 4 — código intermediário, geração e máquina virtual
+
+```bash
+./compilar --ir exemplos/vitrine.mpl          # código de três endereços
+./compilar exemplos/vitrine.mpl               # grava exemplos/vitrine.mplb
+./executar exemplos/vitrine.mplb              # roda na VM
+make verificar E=4
+```
+
+### Código de três endereços (`mplc/intermediario.py`)
+
+A AST anotada pela semântica é percorrida e cada expressão composta é
+quebrada com temporários `t0, t1, ...`, de modo que **cada linha tem no
+máximo um operador** (`t2 = t0 + t1`). As formas são: `d = a`,
+`d = a op b`, `d = op a`, `d = paraReal a`, `L:`, `desvie L`,
+`seFalso a desvie L`, `d = chama f a, b`, `retorne a` e `escreva a`.
+Linhas `; linha N` marcam o comando do fonte, para os erros de execução.
+
+Cada símbolo resolvido pela E3 vira um nome único dentro da função; um nome
+sombreado ganha o sufixo `@escopo` (`x@5`), que não colide com nenhum
+identificador da MPL. A promoção `inteiro → real` é uma instrução explícita
+(`paraReal`), emitida **depois** da operação inteira: em `real x = 7 / 2;`
+a divisão inteira dá `3` e só então vira `3.000000`.
+
+### Máquina virtual (`mplc/vm.py`)
+
+Máquina de pilha com uma pilha de operandos e uma pilha de **registros de
+ativação**. Cada `CHAMA` cria um registro novo com seus próprios locais
+(parâmetros, variáveis e temporários), o endereço de retorno e a linha do
+chamador; `RETORNA` o descarta. Por isso a recursão direta e a mútua
+funcionam: `fatorial(5)` não sobrescreve o `n` de `fatorial(4)`. O laço da
+VM é iterativo (não usa a recursão do Python). Mais de 10000 chamadas
+aninhadas é estouro de pilha.
+
+A divisão inteira trunca em direção a zero e o resto é calculado como
+`a - b * (a / b)`, o que dá ao resto o sinal do dividendo (`-7 % 3 = -1`),
+em vez do `%` do Python. Divisão ou resto por zero e estouro de pilha
+terminam com `erro execucao: linha L, ...` e código de saída 2.
+
+### Formato do `.mplb`
+
+Texto, uma instrução por linha: opcode em maiúsculas seguido dos operandos
+documentados abaixo. `CHAMA` recebe nome e aridade; `FUNCAO` recebe nome e
+parâmetros. Linhas começando com `;` são comentários. O arquivo começa com
+`CHAMA principal 0` / `PARA`, seguido das funções. Exemplo (`t2 = n * t1`):
+
+```
+  CARREGA n
+  CARREGA t1
+  MUL
+  GUARDA t2
+```
+
+### Conjunto de instruções da VM
+
+| Instrução | O que faz com a pilha |
+|---|---|
+| `FUNCAO f p1 p2 ...` | pseudo-instrução: marca o início de `f` e os nomes dos parâmetros; não mexe na pilha |
+| `ROTULO L` | pseudo-instrução: marca um destino de desvio; não mexe na pilha |
+| `EMPILHA_INT n` | empilha o inteiro `n` |
+| `EMPILHA_REAL x` | empilha o real `x` |
+| `EMPILHA_LOG v` | empilha `verdadeiro` ou `falso` |
+| `EMPILHA_TXT "s"` | empilha o texto `s` (escapes `\n \t \" \\` decodificados) |
+| `CARREGA x` | empilha o valor do local `x` do registro de ativação atual |
+| `GUARDA x` | desempilha o topo e grava no local `x` do registro atual |
+| `DESCARTA` | desempilha o topo e o joga fora (resultado de chamada usada como comando) |
+| `SOMA` | desempilha `b` e `a`, empilha `a + b` (números ou concatenação de textos) |
+| `SUB` | desempilha `b` e `a`, empilha `a - b` |
+| `MUL` | desempilha `b` e `a`, empilha `a * b` |
+| `DIV` | desempilha `b` e `a`, empilha `a / b` (inteira truncada para zero se os dois forem inteiros); `b = 0` é erro de execução |
+| `RESTO` | desempilha `b` e `a`, empilha o resto com o sinal do dividendo; `b = 0` é erro de execução |
+| `NEG` | desempilha `a`, empilha `-a` |
+| `PARA_REAL` | desempilha um inteiro, empilha o mesmo valor como real |
+| `IGUAL` | desempilha `b` e `a`, empilha `a == b` |
+| `DIFERENTE` | desempilha `b` e `a`, empilha `a != b` |
+| `MENOR` | desempilha `b` e `a`, empilha `a < b` |
+| `MENOR_IGUAL` | desempilha `b` e `a`, empilha `a <= b` |
+| `MAIOR` | desempilha `b` e `a`, empilha `a > b` |
+| `MAIOR_IGUAL` | desempilha `b` e `a`, empilha `a >= b` |
+| `E` | desempilha `b` e `a` (já avaliados, sem curto-circuito), empilha `a e b` |
+| `OU` | desempilha `b` e `a`, empilha `a ou b` |
+| `NAO` | desempilha `a`, empilha `nao a` |
+| `DESVIA L` | não mexe na pilha; continua no rótulo `L` |
+| `DESVIA_SE_FALSO L` | desempilha a condição; se for `falso`, continua no rótulo `L` |
+| `CHAMA f n` | desempilha os `n` argumentos, cria um registro de ativação para `f` com eles nos parâmetros e salta para `f` |
+| `RETORNA` | deixa o valor de retorno no topo, descarta o registro atual e volta ao chamador |
+| `RETORNA_VAZIO` | não mexe na pilha; descarta o registro atual e volta ao chamador |
+| `ESCREVA` | desempilha o topo e o imprime no formato da seção 4.5 (real com 6 casas, `verdadeiro`/`falso`) |
+| `LINHA n` | não mexe na pilha; registra a linha do fonte em execução (para mensagens de erro) |
+| `PARA` | encerra a máquina |
+
+### Programa do grupo: `exemplos/vitrine.mpl`
+
+Como a MPL não converte número em texto, o programa primeiro escreve essa
+conversão na própria MPL (`naBase`, recursiva, para qualquer base de 2 a
+10) e depois a usa para mostrar a Torre de Hanói com 3 discos (recursão em
+função `vazio`), a contagem de movimentos (`2^n - 1`, recursiva), números em
+binário e octal, raiz quadrada pelo método de Newton (reais e promoção de
+argumento `raiz(10)`), os passos de Collatz de 27 e as duas armadilhas da
+divisão. A saída esperada está em `exemplos/vitrine.saida`.
+
 ## Execução e validação
 
 Na raiz do repositório, em Linux/Cloud Shell com Python 3.12, GNU Make,
@@ -92,12 +197,15 @@ Git e shell POSIX:
 ./compilar --tokens exemplos/ola.mpl
 ./compilar --ast exemplos/tudo.mpl
 ./compilar --tabela exemplos/tudo.mpl
+./compilar --ir exemplos/tudo.mpl
+./compilar exemplos/tudo.mpl && ./executar exemplos/tudo.mplb
 make verificar E=1
 make verificar E=2
 make verificar E=3
+make verificar E=4
 python3 -B -m unittest discover -s testes -p 'test_*.py' -v
-make evidencias E=3
-make prova E=3
+make evidencias E=4
+make prova E=4
 make prova
 ```
 
@@ -110,15 +218,24 @@ matrizes de operadores e conversões, retornos estruturais e a CLI.
 `make evidencias E=3` grava `evidencias/verificacao-3.txt`. As evidências
 fazem parte da entrega e devem ser versionadas. `make prova E=3` verifica
 a entrega atual em um clone temporário do **último commit**; alterações
-não commitadas não entram. `make prova` sem `E` verifica as quatro entregas
-e também cobrará a E4 ainda pendente. Consulte os resultados reais e as
-limitações da validação em [evidencias/auditoria-e3.md](evidencias/auditoria-e3.md).
+não commitadas não entram. `make prova` sem `E` verifica as quatro entregas.
+`make evidencias E=4` grava `evidencias/verificacao-4.txt`. Consulte os resultados reais e as
+limitações da validação em [evidencias/auditoria-e4.md](evidencias/auditoria-e4.md).
+A auditoria da E3 permanece como registro histórico daquela entrega.
+
+A automação em `.github/workflows/verificar.yml` executa as quatro entregas,
+os testes adicionais e o programa do grupo em um clone Linux. O roteiro de
+demonstração está em [apresentacao/roteiro.md](apresentacao/roteiro.md), junto
+dos [slides em PDF](apresentacao/apresentacao-grupo-NN.pdf). Substitua `NN`
+pelo número do grupo antes de enviar o PDF à disciplina.
 
 ## Proveniência e entrega
 
 O histórico Git mantém a base do professor e as implementações anteriores.
 A implementação da E3, seus testes adicionais e a revisão documental
-receberam auxílio do Codex. O grupo deve revisar e compreender o código
+receberam auxílio do Codex. A finalização da E4, os testes de execução,
+a automação e o material de apresentação também receberam esse auxílio.
+O grupo deve revisar e compreender o código
 para a defesa e as alterações ao vivo previstas no enunciado; esta nota
 não substitui as regras acadêmicas em [entregas/APRESENTACAO.md](entregas/APRESENTACAO.md).
 
